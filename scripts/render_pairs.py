@@ -2,9 +2,18 @@
 import argparse
 import json
 import shutil
+import time
 from pathlib import Path
 from typing import Dict, List
 
+import sys
+
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
+
+from nifi.utils.diagnostics import enable_faulthandler_signal
+from nifi.utils.logging import get_logger
 
 
 def parse_args() -> argparse.Namespace:
@@ -99,6 +108,10 @@ def copy_pairs(artifact_scene_dir: Path, scene_out: Path, split: str) -> Dict[st
 
 
 def main() -> None:
+    enable_faulthandler_signal()
+    logger = get_logger("nifi.render_pairs")
+    t0 = time.time()
+
     args = parse_args()
     artifact_scene_dir = Path(args.scene)
     if not artifact_scene_dir.exists():
@@ -108,7 +121,9 @@ def main() -> None:
     scene_out = resolve_scene_output(Path(args.out), scene_name)
     scene_out.mkdir(parents=True, exist_ok=True)
 
+    logger.info("[stage:start] render_pairs scene=%s split=%s out=%s", artifact_scene_dir, args.split, scene_out)
     stats = copy_pairs(artifact_scene_dir, scene_out, args.split)
+    logger.info("[stage:end] render_pairs elapsed=%.2fs outputs=%s", time.time() - t0, stats)
     print(json.dumps({"scene_out": str(scene_out), "stats": stats}, indent=2))
 
 

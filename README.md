@@ -219,6 +219,34 @@ python scripts/train_nifi.py --config configs/default.yaml --data_root pairs/ --
 python scripts/eval_nifi.py --ckpt runs/nifi_tiny/best.pt --data_root pairs/ --split test --out runs/nifi_tiny/metrics.json
 ```
 
+## 8.1 Self-test (Auto Diagnostics + Auto Fallback)
+
+Run one command to execute build -> pair rendering -> metrics with hang detection, diagnostics, and retries:
+
+```bash
+python scripts/selftest_pipeline.py \
+  --scene data/mipnerf360/garden \
+  --out artifacts/garden_selftest \
+  --rates 0.5 \
+  --smoke
+```
+
+What success looks like:
+- Console ends with `PASS`
+- `artifacts/garden_selftest/` contains:
+  - `run_manifest.json` (stage timings + environment + artifacts)
+  - `selftest_manifest.json` (step retries + final assertions)
+  - `logs/*.log` (captured subprocess output)
+  - at least one readable `.png`
+  - `metrics.json` and `metrics.csv` with numeric metrics
+
+If any step hangs (>60s no output) or times out, diagnostics are auto-dumped:
+- process tree
+- CPU/memory snapshot
+- GPU utilization/VRAM snapshot
+- recent output file writes
+- best-effort Python stack traces via `SIGUSR1` + `faulthandler`
+
 ## 9. Robustness Features
 
 - deterministic seeds (`nifi/utils/seed.py`)
