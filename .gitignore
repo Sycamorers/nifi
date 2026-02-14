@@ -1,0 +1,37 @@
+# Ignore data, artifacts, pairs, runs - large datasets and generated outputs
+/data/
+/artifacts/
+/pairs/
+/pairs_real/
+/pairstest/
+/runs/
+
+# Sometimes datasets use these patterns
+/data-*/
+
+# Keep small sample data if any (uncomment and adjust if needed)
+# !data/sample/
+
+# Common Python and environment files
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+env/
+venv/
+.env
+.python-version
+
+# Jupyter
+.ipynb_checkpoints
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDEs
+.vscode/
+.idea/
+
+# Git LFS metadata
+.gitattributes
