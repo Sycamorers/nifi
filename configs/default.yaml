@@ -1,0 +1,54 @@
+seed: 42
+output_dir: runs/nifi_tiny
+image_size: 256
+rates: null
+
+model:
+  pretrained_model_name_or_path: hf-internal-testing/tiny-stable-diffusion-torch
+  guidance_scale: 3.0
+  prompt_dropout: 0.1
+  lora_rank: 64
+  max_token_length: 77
+  vae_scaling_factor: 0.18215
+
+diffusion:
+  num_train_timesteps: 1000
+  t0: 199
+  t_ablation_full: false
+
+train:
+  batch_size: 2
+  num_workers: 4
+  max_steps: 1000
+  grad_accum_steps: 1
+  lr_phi_minus: 1.0e-4
+  lr_phi_plus: 1.0e-4
+  weight_decay: 0.0
+  grad_clip: 1.0
+  log_every: 10
+  eval_every: 100
+  save_every: 100
+  mixed_precision: fp16
+  gradient_checkpointing: false
+  max_train_samples: null
+  max_eval_samples: null
+
+loss_weights:
+  alpha: 0.7
+  kl: 1.0
+  gt: 1.0
+  l2: 1.0
+  lpips: 0.5
+  dists: 0.25
+
+compression:
+  method: proxy
+  jpeg_quality_min: 8
+  jpeg_quality_max: 55
+  downsample_min: 2
+  downsample_max: 8
+
+smoke_test:
+  enabled: false
+  num_images: 10
+  train_steps: 100
