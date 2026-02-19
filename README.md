@@ -217,6 +217,7 @@ Exact paper-level matching can deviate if any of these differ:
 - Paper uses HAC++ low-rate compressed renders; proxy compression is used unless precomputed HAC++ outputs are supplied.
 - Paper uses Qwen2.5-VL prompt extraction; this repo supports prompt files but not full automatic prompt generation workflow.
 
+<!--
 ## 8. Formula-to-Code and Verification Docs
 
 - Workflow mapping: `docs/workflow_module_mapping.md`
@@ -242,3 +243,4 @@ python scripts/train_nifi.py \
   --exp runs/nifi_smoke \
   --smoke_test
 ```
+!-->
