@@ -5,6 +5,8 @@
 /pairs_real/
 /pairstest/
 /runs/
+/outputs/
+/logs/
 
 # Sometimes datasets use these patterns
 /data-*/

@@ -1,9 +1,9 @@
 from collections import defaultdict
 from typing import Dict, List
 
-import numpy as np
 import torch
 import torch.nn as nn
+import numpy as np
 
 
 class PerceptualMetrics(nn.Module):
@@ -37,6 +37,8 @@ class PerceptualMetrics(nn.Module):
 
     @torch.no_grad()
     def lpips(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        pred = pred.float()
+        target = target.float()
         if self.lpips_backend == "lpips":
             out = self.lpips_model(pred, target)
             return out.flatten()
@@ -48,6 +50,8 @@ class PerceptualMetrics(nn.Module):
 
     @torch.no_grad()
     def dists(self, pred: torch.Tensor, target: torch.Tensor) -> torch.Tensor:
+        pred = pred.float()
+        target = target.float()
         pred01 = (pred + 1.0) * 0.5
         target01 = (target + 1.0) * 0.5
 

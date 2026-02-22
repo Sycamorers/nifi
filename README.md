@@ -1,246 +1,180 @@
-# NiFi Reproduction (Third-Party Learning Project)
+# NiFi (NIX&FIX) for Extreme Low-Rate 3DGS Restoration
 
-Original paper:
-- **Nix and Fix: Targeting 1000x Compression of 3D Gaussian Splatting with Diffusion Models**
-- arXiv: https://arxiv.org/abs/2602.04549
+Unofficial third-party implementation and audit of:
+**Nix and Fix: Targeting 1000x Compression of 3D Gaussian Splatting with Diffusion Models** (arXiv:2602.04549).
 
-Disclaimer:
-- This repository is an independent third-party implementation for learning and experimentation.
+This repository provides:
+- Artifact synthesis from real benchmark scenes (`HQ -> compressed LQ`),
+- One-step restoration inference path (Eq. 7),
+- Quality-gated demo outputs with reproducible commands,
+- Diagnostics to prove restoration is applied and not bypassed.
 
-This repository is refactored so the code structure follows the paper workflow:
-- Artifact Synthesis
-- Artifact Restoration
-- Restoration Distribution Matching
-- Perceptual Matching
-- Benchmark Evaluation
+## Disclaimer
 
-## 1. Environment Setup
+This is **not** the official release from the paper authors.
+The paper reports SD3-based training with dedicated adapter weights; those official SD3 adapters are not bundled here.
+This repo includes a reproducible adapter training path plus a strict quality gate, and ships a real-data demo config that passes the gate on `Mip-NeRF360/garden`.
 
-### Python version
-- `Python 3.11`
+## What Is Implemented
 
-### Conda setup
+- Artifact synthesis:
+  - `nifi/artifact_synthesis/compression_simulation.py`
+  - `nifi/gs/compressor.py`
+- Restoration backbone + adapters:
+  - `nifi/diffusion/model.py`
+  - `nifi/artifact_restoration/model.py`
+- Distribution/perceptual training objectives:
+  - `nifi/restoration_distribution_matching/objectives.py`
+  - `nifi/losses/perceptual.py`
+- Demo + diagnostics scripts:
+  - `scripts/run_demo.py`
+  - `scripts/prove_restoration_is_applied.py`
+  - `scripts/quality_gate.py`
+  - `scripts/verify_checkpoints.py`
+  - `scripts/auto_tune_restore_hparams.py`
+  - `scripts/train_adapters.py`
+  - `scripts/env_check.py`
+
+Paper-to-code mapping is in `docs/paper_to_code_map.md`.
+
+## Environment (Conda: `nifi`)
+
+All key commands below are intended to run with:
 ```bash
-conda env create -f environment.yml
-conda activate nifi
+conda run -n nifi <command>
 ```
 
-### Pip setup (alternative)
+Environment sanity:
 ```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -r requirements.txt
+conda run -n nifi python scripts/env_check.py
 ```
+This writes `logs/env_check.txt` and reports Python/Torch/CUDA/GPU versions.
 
-## 2. Repository Structure
+## Checkpoints
 
-```text
-configs/
-  default.yaml
+Single source of truth:
+- `configs/model_paths.yaml`
+  - `restoration.model_config`
+  - `restoration.adapter_checkpoint`
 
-nifi/
-  artifact_synthesis/
-  artifact_restoration/
-  restoration_distribution_matching/
-  perceptual_matching/
-  benchmark/
-
-scripts/
-  download_data.py
-  download_benchmark_data.py
-  build_3dgs_and_compress.py
-  render_pairs.py
-  prepare_benchmark_pairs.py
-  train_nifi.py
-  eval_nifi.py
-  eval_benchmark_nifi.py
-  verify_paper_implementation.py
-
-docs/
-  workflow_module_mapping.md
-  equation_to_code_mapping.md
-  implementation_verification.md
-```
-
-## 3. Dataset Preparation
-
-## 3.1 Training data (DL3DV scenes)
-The paper trains on DL3DV scenes. If you already have a local subset:
+Verify checkpoint presence + compatibility:
 ```bash
-python scripts/download_data.py \
-  --dataset dl3dv \
-  --out data/ \
-  --dl3dv_source /path/to/local/dl3dv_subset
+conda run -n nifi python scripts/verify_checkpoints.py
 ```
 
-## 3.2 Benchmark datasets (Sec. 4.2)
-Download paper evaluation datasets:
+If you want to train new adapters:
 ```bash
-python scripts/download_benchmark_data.py \
-  --dataset all \
-  --out data/benchmarks
+conda run -n nifi python scripts/train_adapters.py --preset small --data_root pairs_real --exp runs/nifi_sd15_adapters_small
 ```
-
-Optional Mip-NeRF360 subset:
+For a longer run:
 ```bash
-python scripts/download_benchmark_data.py \
-  --dataset mipnerf360 \
-  --out data/benchmarks \
-  --mip_scenes garden bicycle kitchen
+conda run -n nifi python scripts/train_adapters.py --preset full --data_root pairs_real --exp runs/nifi_sd15_adapters_full
 ```
 
-## 4. Preprocessing Pipeline
+## Quickstart (Garden)
 
-## 4.1 Artifact synthesis (clean + degraded renders)
+1) GPU smoke:
 ```bash
-python scripts/build_3dgs_and_compress.py \
-  --scene data/mipnerf360/garden \
-  --rates 0.1 0.5 1.0 \
-  --out artifacts/garden/
+conda run -n nifi python scripts/garden_env_gpu_check.py
 ```
 
-## 4.2 Build pair layout for train/eval
+2) Prove restoration is not bypassed (writes triptychs + diff maps):
 ```bash
-python scripts/render_pairs.py \
-  --scene artifacts/garden/ \
-  --split train \
-  --out pairs/garden/train/
-
-python scripts/render_pairs.py \
-  --scene artifacts/garden/ \
-  --split test \
-  --out pairs/garden/
+conda run -n nifi python scripts/garden_prove_restore_not_noop.py --device cuda --out_dir outputs/garden/noop_check
 ```
 
-Output layout:
-```text
-pairs/<scene>/rate_<lambda>/<split>/clean/*.png
-pairs/<scene>/rate_<lambda>/<split>/degraded/*.png
-```
-
-## 4.3 Benchmark pair preprocessing
-Proxy compression mode:
+3) Inspect adapter checkpoint state:
 ```bash
-python scripts/prepare_benchmark_pairs.py \
-  --dataset mipnerf360 \
-  --dataset_root data/benchmarks/mipnerf360 \
-  --out pairs/benchmarks \
-  --rates 0.1 0.5 1.0 \
-  --compression_method proxy
+conda run -n nifi python scripts/inspect_trainable_and_checkpoints.py
 ```
 
-Precomputed HAC++ mode:
+4) Train Garden adapters on GPU for a substantial run (minimum 10k steps):
 ```bash
-python scripts/prepare_benchmark_pairs.py \
-  --dataset tanks_temples \
-  --dataset_root data/benchmarks/tanks_temples \
-  --out pairs/benchmarks \
-  --rates 0.1 0.5 1.0 \
-  --compression_method precomputed \
-  --compressed_root /path/to/hacpp/renders
+conda run -n nifi python scripts/train_garden_adapters.py --device cuda --max_steps 10000 --val_every 250 --save_every 1000
 ```
-
-## 5. Training
-
-Exact command:
+If quality gate is still insufficient at 10k, run Debug+Adjust and continue:
 ```bash
-python scripts/train_nifi.py \
-  --config configs/default.yaml \
-  --data_root pairs/ \
-  --exp runs/nifi_train
+conda run -n nifi python scripts/garden_debug_adjust.py --device cuda
 ```
 
-### Paper-matched hyperparameters in `configs/default.yaml`
-- `model.guidance_scale: 7.5`
-- `model.lora_rank: 64`
-- `diffusion.t0: 199`
-- `train.batch_size: 4`
-- `train.max_steps: 60000`
-- `train.lr_phi_minus: 5e-6`
-- `train.lr_phi_plus: 1e-6`
-- `train.weight_decay: 1e-4`
-- `train.grad_clip: 1.0`
-- `loss_weights.alpha: 0.7`
-- `model.prompt_dropout: 0.1`
-
-Training outputs:
-- `runs/<exp>/latest.pt`
-- `runs/<exp>/best.pt`
-- `runs/<exp>/train_log.csv`
-- `runs/<exp>/train_summary.json`
-
-## 6. Evaluation
-
-## 6.1 Pair-root evaluation
+5) Auto-tune Garden config:
 ```bash
-python scripts/eval_nifi.py \
-  --ckpt runs/nifi_train/best.pt \
-  --data_root pairs/ \
-  --split test \
-  --out runs/nifi_train/metrics.json
+conda run -n nifi python scripts/auto_tune_garden.py --device cuda
 ```
 
-Expected output format (`metrics.json`):
-- `metrics.aggregate.lpips_before`
-- `metrics.aggregate.lpips_after`
-- `metrics.aggregate.dists_before`
-- `metrics.aggregate.dists_after`
-- `records[]` with per-image metrics
-
-## 6.2 Benchmark protocol evaluation (Sec. 4.2)
+6) Run final Garden demo with chosen checkpoint:
 ```bash
-python scripts/eval_benchmark_nifi.py \
-  --ckpt runs/nifi_train/best.pt \
-  --data_root pairs/benchmarks \
-  --split test \
-  --out runs/nifi_train/benchmark_metrics.json
+conda run -n nifi python scripts/run_demo.py --dataset garden --device cuda --checkpoint checkpoints/garden/adapter_best.pt --config configs/garden_known_good.yaml
 ```
 
-Expected output format (`benchmark_metrics.json`):
-- `summary.aggregate`
-- `summary.per_dataset`
-- `summary.per_dataset_rate`
-- `summary.per_scene`
-- `paper_comparison` (delta vs paper Table 1 NiFi numbers)
-
-## 7. Reproducing Paper Results
-
-Paper reports LPIPS/DISTS for NiFi at three rates (`lambda in {0.1, 0.5, 1.0}`):
-
-- Mip-NeRF360: `0.178/0.109`, `0.235/0.133`, `0.265/0.153`
-- Tanks & Temples: `0.128/0.076`, `0.180/0.095`, `0.212/0.109`
-- DeepBlending: `0.133/0.101`, `0.180/0.131`, `0.218/0.156`
-
-### Important deviation notes
-Exact paper-level matching can deviate if any of these differ:
-- Paper uses SD3 backbone; default config uses a lightweight SD-compatible model for practicality.
-- Paper uses HAC++ low-rate compressed renders; proxy compression is used unless precomputed HAC++ outputs are supplied.
-- Paper uses Qwen2.5-VL prompt extraction; this repo supports prompt files but not full automatic prompt generation workflow.
-
-<!--
-## 8. Formula-to-Code and Verification Docs
-
-- Workflow mapping: `docs/workflow_module_mapping.md`
-- Equation mapping: `docs/equation_to_code_mapping.md`
-- Verification report: `docs/implementation_verification.md`
-
-Run equation verification:
+7) Enforce Garden quality gate (strict LPIPS margin + non-no-op + sharpness):
 ```bash
-python scripts/verify_paper_implementation.py
+conda run -n nifi python scripts/quality_gate.py --demo_dir outputs/demo/garden/garden --garden_mode
 ```
 
-Run unit tests:
+Outputs:
+- Validation triptychs during training: `outputs/garden/val/step_*/view_*/triptych.png`
+- Training metrics curve: `outputs/garden/metrics.csv`
+- Checkpoints: `checkpoints/garden/adapter_step*.pt`, `checkpoints/garden/phi_minus_step*.safetensors`
+- `outputs/demo/garden/garden/hq/`
+- `outputs/demo/garden/garden/lq/`
+- `outputs/demo/garden/garden/restored/`
+- `outputs/demo/garden/garden/triptych/`
+- `outputs/demo/garden/garden/manifest.json`
+- `outputs/demo/garden/garden/quality_gate_report.json`
+
+## Qualitative Results (Garden)
+
+`Garden` triptychs (`HQ | Compressed | Restored`), generated with `configs/garden_known_good.yaml` + `checkpoints/garden/adapter_best.pt` (step `9750`):
+
+![garden view 000](docs/assets/qualitative/garden/garden/view_000.png)
+![garden view 001](docs/assets/qualitative/garden/garden/view_001.png)
+![garden view 002](docs/assets/qualitative/garden/garden/view_002.png)
+![garden view 003](docs/assets/qualitative/garden/garden/view_003.png)
+
+## Reproducibility Snapshot
+
+From `outputs/demo/garden/garden/manifest.json` + `quality_gate_report.json`:
+- LPIPS mean: `0.7265 -> 0.7011` (gain `+0.0254`)
+- Laplacian sharpness mean: `0.0009824 -> 0.0011534` (non-decreasing)
+- Quality gate: `PASS` on all selected Garden demo views
+
+## Diagnostics
+
+Prove restoration path is actually running:
 ```bash
-python -m pytest -q tests/test_paper_alignment.py
+conda run -n nifi python scripts/prove_restoration_is_applied.py --dataset mipnerf360 --scene garden --view 0 --device cuda --t0_variant small --adapter_scale 1.0
 ```
 
-## 9. One-Command Minimal Smoke Path
-
+Sanity bypass check:
 ```bash
-python scripts/train_nifi.py \
-  --config configs/default.yaml \
-  --data_root pairs/ \
-  --exp runs/nifi_smoke \
-  --smoke_test
+conda run -n nifi python scripts/prove_restoration_is_applied.py --dataset mipnerf360 --scene garden --view 0 --device cuda --disable_restore
 ```
-!-->
+
+HQ source quality check:
+```bash
+conda run -n nifi python scripts/diagnose_hq_quality.py --dataset mipnerf360 --scene garden
+```
+
+## Troubleshooting (`restored == lq`)
+
+- Run `scripts/prove_restoration_is_applied.py` and verify:
+  - non-zero `mean_abs_diff_restored_vs_lq`,
+  - non-null latent stats,
+  - expected `t0`, `sigma_t0`, and checkpoint paths.
+- Run `scripts/verify_checkpoints.py` to catch missing/incompatible adapters.
+- Confirm `configs/model_paths.yaml` points to the intended model/config/adapter files.
+- Re-run `scripts/auto_tune_restore_hparams.py` and regenerate demo config.
+
+## Citation
+
+If this repo helps your work, cite the original paper:
+
+```bibtex
+@article{eteke2026nixfix,
+  title={Nix and Fix: Targeting 1000x Compression of 3D Gaussian Splatting with Diffusion Models},
+  author={Eteke, Cem and Tartaglione, Enzo},
+  journal={arXiv preprint arXiv:2602.04549},
+  year={2026}
+}
+```

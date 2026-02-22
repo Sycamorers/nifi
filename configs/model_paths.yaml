@@ -1,0 +1,6 @@
+restoration:
+  model_config: configs/default_sd15.yaml
+  adapter_checkpoint: checkpoints/garden/adapter_best.pt
+  notes:
+  - Garden checkpoint from 10k-step CUDA run (best at step 9750).
+  - Re-train with scripts/train_garden_adapters.py for longer/further tuning if needed.

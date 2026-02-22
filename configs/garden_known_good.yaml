@@ -1,0 +1,47 @@
+dataset:
+  name: garden
+  scene: garden
+demo:
+  rate_presets:
+    selected: 0.1
+    low: 0.1
+    medium: 0.5
+    high: 1.0
+  default_rate: selected
+  auto_num_views: 4
+  prefer_test_split: true
+restoration:
+  prompt: ''
+  t0: 149
+  adapter_scale: 0.5
+  detail_boost: 0.5
+  detail_sigma: 1.2
+  final_output: nifi_eq7
+  candidate_order:
+  - nifi_eq7
+  model_paths: configs/model_paths.yaml
+  require_nifi_restorer: true
+quality_gate:
+  enabled: true
+  fail_on_violation: true
+  min_lpips_margin: 0.02
+  min_dists_margin: 0.0
+  min_ssim_gain: 0.0
+  require_sharpness_non_decrease: true
+  min_abs_diff: 0.01
+compression:
+  jpeg_quality_min: 8
+  jpeg_quality_max: 55
+  downsample_min: 2
+  downsample_max: 8
+selection:
+  chosen_rate: 0.1
+  chosen_t0: 149
+  chosen_scale: 0.5
+  chosen_score: 0.017315084718090172
+  chosen_lpips_gain: 0.024486184120178223
+  chosen_ssim_gain: -0.028763025999069214
+  chosen_sharpness_gain: 0.00019657097679252425
+  chosen_detail_boost: 0.5
+  chosen_detail_sigma: 1.2
+  used_passing_only: true
